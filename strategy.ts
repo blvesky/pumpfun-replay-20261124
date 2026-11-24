@@ -2,13 +2,15 @@
 //
 // Idea: most new pump.fun curves die within minutes, but a launch that already
 // shows a real crowd in its first slots — several trades, several distinct
-// buyers, the creator still holding, and at least 1 SOL of real reserves —
+// buyers, the creator still holding with 0.5-2.5 SOL of their own money in,
+// and at least 1 SOL of real reserves —
 // is worth a small, fast punt. We buy at most 0.2 SOL per coin, take profit
-// at +25%, cut at -12%, and never hold more than 10 slots, so a loser costs
-// little and a runner pays for many losers. We never buy a coin whose
-// creator has already sold, and we exit at once if the creator sells while
-// we hold. One order per trade: splitting orders into pieces only buys extra
-// tx fees, and this competition sets no minimum fill count.
+// at +10%, cut the moment the position is worth less than its cost, and never
+// hold more than 5 slots, so a loser costs little and a runner pays for many
+// losers. We never buy a coin whose creator has already sold, and we exit at
+// once if the creator sells while we hold. One order per trade: splitting
+// orders into pieces only buys extra tx fees, and this competition sets no
+// minimum fill count.
 //
 // Everything is a pure function of the batches the harness sends: no clock,
 // no randomness, no I/O, so the two graded executions produce byte-identical
@@ -55,13 +57,21 @@ export interface Params {
   exitOnDevSell: boolean;
 }
 
-// Tuned on the kit dev window with the sniper grid tool. The region is flat:
-// tp 800-2500, sl 600-2000 and maxHold 6-20 all stay positive, and the
-// entry filter (minTrades 5, 3-5 buyers, >= 1 SOL real reserves, creator
-// not sold) is what carries the edge, not any single exit value.
+// Tuned on the kit dev window (all three parts, 128,058 events) with the
+// sniper grid tool. The edge is the creator: a launch whose creator bought
+// 0.5-2.5 SOL in the create slot, with 7+ trades and 3-8 distinct buyers in
+// its first 3 slots, is a live pump, not a stillborn curve. The exit is a
+// breakeven stop (sell the moment the position is worth less than its cost)
+// with a +10% take-profit and a 5-slot hold cap, so losers are cut before
+// they bleed and the rare vertical pump is banked. The region is flat:
+// minTrades 6-8, minDevBuy 0.4-0.6 SOL and maxBuyers 8-12 all stay positive
+// (dev +0.076 to +0.111 SOL); the chosen point sits in the middle of it.
 // One order per trade on purpose: splitting orders into pieces only buys
-// extra tx fees, and dropping the splitter lifted dev PnL from +0.066 to
-// +0.081 SOL.
+// extra tx fees, and this competition sets no minimum fill count.
+// Honest caveat: on the dev window most of the net comes from one coin
+// that pumped ~7x in the slots after entry; without it the run is about
+// -0.05 SOL. The filter is what finds such pumps, but a single runner is
+// what pays for the rest.
 export const DEFAULT_PARAMS: Params = {
   minAge: 1,
   maxAge: 3,
@@ -69,18 +79,18 @@ export const DEFAULT_PARAMS: Params = {
   minBuyLamports: 5_000_000,
   minRealSol: 1_000_000_000,
   maxRealSol: 30_000_000_000,
-  minDevBuy: 0,
+  minDevBuy: 500_000_000,
   maxDevBuy: 2_500_000_000,
-  minTrades: 5,
+  minTrades: 7,
   minBuyers: 3,
-  maxBuyers: 5,
+  maxBuyers: 8,
   maxSellRatioBps: 10_000,
   maxBigSellBps: 10_000,
   skipDevSold: true,
   buySlippageBps: 10_000,
-  tpBps: 2500,
-  slBps: 1200,
-  maxHold: 10,
+  tpBps: 1000,
+  slBps: 0,
+  maxHold: 5,
   exitOnDevSell: true,
 };
 
